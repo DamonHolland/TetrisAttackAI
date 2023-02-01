@@ -1,12 +1,14 @@
-import copy
+
+def custom_deepcopy(lst):
+    return [list(map(int, row)) for row in lst]
 
 
 class GameState:
     MOVE_OPTIONS = [(i, j) for i in range(5) for j in range(11)]
     BOARD_WIDTH = 6
     BOARD_HEIGHT = 12
-    COMBO_SCORE = {3: 30, 4: 60, 5: 80, 6: 200, 7: 230, 8: 250, 9: 400, 10: 600, 11: 800, 12: 1000}
-    CHAIN_SCORE = {2: 50, 3: 80, 4: 150, 5: 300, 6: 400, 7: 500, 8: 700, 9: 900, 10: 1100, 11: 1300, 12: 1500, 13: 1800}
+    COMBO_SCORE = {3: 30, 4: 80, 5: 140, 6: 200, 7: 300, 8: 400, 9: 500, 10: 600, 11: 800, 12: 1000}
+    CHAIN_SCORE = {2: 100, 3: 150, 4: 200, 5: 300, 6: 400, 7: 500, 8: 700, 9: 900, 10: 1100, 11: 1300, 12: 1500, 13: 1800}
 
     def __init__(self, parent: 'GameState' or None, new_move: tuple[int, int] or None,
                  initial_tiles: list[list[int]] = None, initial_chain: int = None):
@@ -21,7 +23,7 @@ class GameState:
             self.moves: list[tuple[int, int]] = []
             self.initial_chain = initial_chain
         self.chain: int = self.initial_chain
-        self.state: list[list[int]] = copy.deepcopy(self.initial_state)
+        self.state: list[list[int]] = custom_deepcopy(self.initial_state)
         self.combos: list[int] = list()
         self.locked_cells: set[tuple[int, int]] = set()
         self._fitness = None
@@ -36,19 +38,23 @@ class GameState:
         self.simulate_gravity()
         if self.simulate_combo():
             self.chain += 1
+        else:
+            self.chain = 1
 
     def __lt__(self, other):
         return (0 - self.fitness) < (0 - other.fitness)
 
     def simulate_combo(self, lock_cells: bool = False) -> bool:
         combo = set()
-        for col in range(self.BOARD_WIDTH):
-            for row in range(self.BOARD_HEIGHT - 2):
-                if self.state[col][row] and self.state[col][row] == self.state[col][row + 1] == self.state[col][row + 2]:
+        for row in range(self.BOARD_HEIGHT - 2):
+            for col in range(self.BOARD_WIDTH):
+                color = self.state[col][row]
+                if color and color == self.state[col][row + 1] == self.state[col][row + 2]:
                     combo.update((col, row + i) for i in range(3))
-        for row in range(self.BOARD_HEIGHT):
-            for col in range(self.BOARD_WIDTH - 2):
-                if self.state[col][row] and self.state[col][row] == self.state[col + 1][row] == self.state[col + 2][row]:
+        for col in range(self.BOARD_WIDTH - 2):
+            for row in range(self.BOARD_HEIGHT):
+                color = self.state[col][row]
+                if color and color == self.state[col + 1][row] == self.state[col + 2][row]:
                     combo.update((col + i, row) for i in range(3))
 
         combo_len = len(combo)
@@ -94,7 +100,7 @@ class GameState:
         chain_score = sum(self.CHAIN_SCORE.get(chain, 0) for chain in range(self.chain))
         combo_score = sum(self.COMBO_SCORE.get(combo, 0) for combo in self.combos)
         tallest, roughness = self.get_height_metrics()
-        self._fitness = chain_score + combo_score - (tallest * 10) - (roughness * 5) - len(self.moves)
+        self._fitness = chain_score + combo_score - pow(tallest, 3) - pow(roughness, 2) - pow(2, len(self.moves))
         return self._fitness
 
     def print_board(self):
