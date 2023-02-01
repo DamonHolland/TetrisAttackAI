@@ -8,7 +8,7 @@ import pyautogui
 
 def pause_fix(_pause):
     if _pause:
-        nanosleep(50000000)
+        nanosleep(25000000)
 
 
 pydirectinput._handlePause = pause_fix
@@ -70,7 +70,7 @@ class Game:
                 curr_addr -= 2
             tile_map.append(list(reversed(game_row)))
             curr_addr -= 4
-        return tile_map
+        return list(map(list, zip(*tile_map)))
 
     def get_chain(self) -> int:
         return int.from_bytes(self.snes_process.read_bytes(self.chain_addr, 1), 'little') + 1
@@ -100,6 +100,7 @@ class Game:
     def restart_game(self):
         if not self.game_window.isActive:
             self.game_window.activate()
+        time.sleep(0.2)
         pydirectinput.press(self.RESET_KEY)
         while True:
             if self.is_game_live():
