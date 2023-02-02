@@ -1,3 +1,5 @@
+from fitness_evaluator import FitnessEvaluator
+
 
 def custom_deepcopy(lst):
     return [list(map(int, row)) for row in lst]
@@ -7,10 +9,8 @@ class GameState:
     MOVE_OPTIONS = [(i, j) for i in range(5) for j in range(11)]
     BOARD_WIDTH = 6
     BOARD_HEIGHT = 12
-    COMBO_SCORE = {3: 30, 4: 80, 5: 140, 6: 200, 7: 300, 8: 400, 9: 500, 10: 600, 11: 800, 12: 1000}
-    CHAIN_SCORE = {2: 100, 3: 150, 4: 200, 5: 300, 6: 400, 7: 500, 8: 700, 9: 900, 10: 1100, 11: 1300, 12: 1500, 13: 1800}
 
-    def __init__(self, parent: 'GameState' or None, new_move: tuple[int, int] or None,
+    def __init__(self, evaluator: FitnessEvaluator, parent: 'GameState' or None, new_move: tuple[int, int] or None,
                  initial_tiles: list[list[int]] = None, initial_chain: int = None, terminal: bool = False):
         # Initial state initialisation
         self.parent: GameState = parent
@@ -22,13 +22,14 @@ class GameState:
             self.initial_state: list[list[int]] = initial_tiles
             self.moves: list[tuple[int, int]] = []
             self.initial_chain = initial_chain
+        self.evaluator = evaluator
         self.chain: int = self.initial_chain
         self.state: list[list[int]] = custom_deepcopy(self.initial_state)
         self.combos: list[int] = list()
         self.locked_cells: set[tuple[int, int]] = set()
         self.terminal_cells: set[tuple[int, int]] = set()
-        self._fitness = None
         self.terminal = terminal
+        self._fitness = None
 
         # Pre-gravity checks
         for x, y in self.moves:
@@ -43,8 +44,8 @@ class GameState:
         else:
             self.chain = 1
 
-    def __lt__(self, other):
-        return (0 - self.fitness) < (0 - other.fitness)
+    def __lt__(self, other: 'GameState'):
+        return (0 - self.fitness) < (0 - other._fitness)
 
     def simulate_combo(self, lock_cells: bool = False) -> bool:
         combo = set()
@@ -106,14 +107,11 @@ class GameState:
                 break
         return max(col_heights), sum(abs(a - b) for a, b in zip(col_heights, col_heights[1:]))
 
-    @property
-    def fitness(self) -> int:
-        if self._fitness: return self._fitness
-        chain_score = sum(self.CHAIN_SCORE.get(chain, 0) for chain in range(self.chain))
-        combo_score = sum(self.COMBO_SCORE.get(combo, 0) for combo in self.combos)
+    def get_metrics(self) -> list[int]:
         tallest, roughness = self.get_height_metrics()
-        self._fitness = chain_score + combo_score - pow(tallest, 3) - pow(roughness, 2) - pow(2, len(self.moves))
-        return self._fitness
+        padded_combos = self.combos[:10]
+        padded_combos += [0] * (10 - len(padded_combos))
+        return padded_combos + [self.chain] + [tallest] + [roughness] + [len(self.moves)]
 
     def print_board(self):
         print(''.center(11, '-'))
@@ -123,8 +121,14 @@ class GameState:
             print()
         print(''.center(11, '-'))
 
+    @property
+    def fitness(self) -> int:
+        if self._fitness: return self._fitness
+        self._fitness = self.evaluator.get_fitness(self.get_metrics())
+        return self._fitness
+
     def get_valid_children(self) -> list['GameState']:
         if self.terminal: return []
         valid = [m for m in self.MOVE_OPTIONS if m not in self.locked_cells
                  and (m[0] + 1, m[1]) not in self.locked_cells and self.state[m[0]][m[1]] != self.state[m[0] + 1][m[1]]]
-        return [GameState(self, m, terminal=(m in self.terminal_cells)) for m in valid]
+        return [GameState(self.evaluator, self, m, terminal=(m in self.terminal_cells)) for m in valid]
