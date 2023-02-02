@@ -11,7 +11,7 @@ class GameState:
     CHAIN_SCORE = {2: 100, 3: 150, 4: 200, 5: 300, 6: 400, 7: 500, 8: 700, 9: 900, 10: 1100, 11: 1300, 12: 1500, 13: 1800}
 
     def __init__(self, parent: 'GameState' or None, new_move: tuple[int, int] or None,
-                 initial_tiles: list[list[int]] = None, initial_chain: int = None):
+                 initial_tiles: list[list[int]] = None, initial_chain: int = None, terminal: bool = False):
         # Initial state initialisation
         self.parent: GameState = parent
         if parent:
@@ -26,13 +26,15 @@ class GameState:
         self.state: list[list[int]] = custom_deepcopy(self.initial_state)
         self.combos: list[int] = list()
         self.locked_cells: set[tuple[int, int]] = set()
+        self.terminal_cells: set[tuple[int, int]] = set()
         self._fitness = None
+        self.terminal = terminal
 
         # Pre-gravity checks
         for x, y in self.moves:
             self.state[x][y], self.state[x + 1][y] = self.state[x + 1][y], self.state[x][y]
             self.simulate_combo(lock_cells=True)
-        self.lock_gravity_affected_cells(len(self.moves))
+        self.lock_gravity_affected_cells()
 
         # Post-gravity checks
         self.simulate_gravity()
@@ -64,6 +66,7 @@ class GameState:
                     self.locked_cells.add(cell)
                 self.state[cell[0]][cell[1]] = 0
             self.combos.append(combo_len)
+            self.chain = 1
         return combo_len != 0
 
     def simulate_gravity(self):
@@ -73,17 +76,26 @@ class GameState:
                 stripped_col += [0] * (self.BOARD_HEIGHT - len(stripped_col))
                 self.state[col] = stripped_col
 
-    def lock_gravity_affected_cells(self, gravity_depth: int = 1):
-        for col_num, col in enumerate(self.state):
-            for i in range(self.BOARD_HEIGHT - 1, -1, -1):
-                if not col[i] or (col_num, i) in self.locked_cells:
+    def lock_gravity_affected_cells(self):
+        for col in range(self.BOARD_WIDTH):
+            zero_count = 0
+            gravity_locked, gravity_terminal = set(), set()
+            for row in range(self.BOARD_HEIGHT):
+                if (col, row) in self.locked_cells:
+                    zero_count = 0
                     continue
-                for j in range(i-1, max(-1, i-gravity_depth-1), -1):
-                    if (col_num, j) in self.locked_cells:
-                        break
-                    if not col[j]:
-                        self.locked_cells.update({(col_num, row_num) for row_num in range(j, i)})
-                        break
+                if self.state[col][row]:
+                    if zero_count:
+                        gravity_terminal.update((col, r) for r in range(row - zero_count, row + 1))
+                        gravity_locked.update((col, r) for r in range(row - 1, row + 1))
+                else:
+                    zero_count += 1
+            self.locked_cells.update(gravity_locked)
+            terminal_cells = gravity_terminal.difference(gravity_locked)
+            if len(self.moves) == 1:
+                self.terminal_cells.update(terminal_cells)
+            else:
+                self.locked_cells.update(terminal_cells)
 
     def get_height_metrics(self) -> tuple[int, int]:
         col_heights = []
@@ -112,6 +124,7 @@ class GameState:
         print(''.center(11, '-'))
 
     def get_valid_children(self) -> list['GameState']:
+        if self.terminal: return []
         valid = [m for m in self.MOVE_OPTIONS if m not in self.locked_cells
                  and (m[0] + 1, m[1]) not in self.locked_cells and self.state[m[0]][m[1]] != self.state[m[0] + 1][m[1]]]
-        return [GameState(self, m) for m in valid]
+        return [GameState(self, m, terminal=(m in self.terminal_cells)) for m in valid]

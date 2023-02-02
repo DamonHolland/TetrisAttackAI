@@ -19,7 +19,7 @@ def find_best(initial_state, time_ns):
             if new_state.fitness > best_state.fitness:
                 best_state = new_state
             heapq.heappush(search_queue, new_state)
-    print(f"Scanned: {len(search_queue)} Best: {best_state.moves}")
+    print(f"Scanned: {len(search_queue)} Best: {best_state.moves}, Terminal: {best_state.terminal}")
     return best_state
 
 
