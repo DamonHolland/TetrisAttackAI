@@ -31,6 +31,7 @@ class Game:
     RAISE_KEY = 's'
     PRESS_KEY = 'v'
     RESET_KEY = 'f1'
+    CHANGE_SAVE_KEY = 'f3'
     ALL_KEYS = [LEFT_KEY, UP_KEY, RIGHT_KEY, DOWN_KEY, RAISE_KEY, RESET_KEY]
 
     def __init__(self):
@@ -101,6 +102,8 @@ class Game:
         if not self.game_window.isActive:
             self.game_window.activate()
         time.sleep(0.2)
+        pydirectinput.press(self.CHANGE_SAVE_KEY)
+        time.sleep(0.1)
         pydirectinput.press(self.RESET_KEY)
         while True:
             if self.is_game_live():

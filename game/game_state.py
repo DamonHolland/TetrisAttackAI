@@ -1,4 +1,4 @@
-from fitness_evaluator import FitnessEvaluator
+from agent.evaluators.fitness_evaluator import FitnessEvaluator
 
 
 def custom_deepcopy(lst):
@@ -11,17 +11,20 @@ class GameState:
     BOARD_HEIGHT = 12
 
     def __init__(self, evaluator: FitnessEvaluator, parent: 'GameState' or None, new_move: tuple[int, int] or None,
-                 initial_tiles: list[list[int]] = None, initial_chain: int = None, terminal: bool = False):
+                 initial_tiles: list[list[int]] = None, initial_chain: int = None,
+                 initial_cursor: tuple[int, int] or None = None, terminal: bool = False):
         # Initial state initialisation
         self.parent: GameState = parent
         if parent:
             self.initial_state: list[list[int]] = self.parent.initial_state
             self.moves: list[tuple[int, int]] = self.parent.moves + [new_move]
             self.initial_chain = self.parent.initial_chain
+            self.initial_cursor: tuple[int, int] = self.parent.initial_cursor
         else:
             self.initial_state: list[list[int]] = initial_tiles
             self.moves: list[tuple[int, int]] = []
             self.initial_chain = initial_chain
+            self.initial_cursor: tuple[int, int] = initial_cursor
         self.evaluator = evaluator
         self.chain: int = self.initial_chain
         self.state: list[list[int]] = custom_deepcopy(self.initial_state)
@@ -111,7 +114,14 @@ class GameState:
         tallest, roughness = self.get_height_metrics()
         padded_combos = self.combos[:10]
         padded_combos += [0] * (10 - len(padded_combos))
-        return padded_combos + [self.chain] + [tallest] + [roughness] + [len(self.moves)]
+        return padded_combos + [self.chain] + [tallest] + [roughness] + [self.get_move_count()]
+
+    def get_move_count(self) -> int:
+        moves = [self.initial_cursor] + self.moves
+        move_count = 0
+        for i in range(1, len(moves)):
+            move_count += abs(moves[i][0] - moves[i - 1][0]) + abs(moves[i][1] - moves[i - 1][1]) + 1
+        return move_count
 
     def print_board(self):
         print(''.center(11, '-'))
@@ -122,7 +132,7 @@ class GameState:
         print(''.center(11, '-'))
 
     @property
-    def fitness(self) -> int:
+    def fitness(self) -> float:
         if self._fitness: return self._fitness
         self._fitness = self.evaluator.get_fitness(self.get_metrics())
         return self._fitness

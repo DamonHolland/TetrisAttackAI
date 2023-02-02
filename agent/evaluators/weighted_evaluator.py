@@ -1,9 +1,4 @@
-from abc import abstractmethod
-
-
-class FitnessEvaluator:
-    @abstractmethod
-    def get_fitness(self, metrics: list[int]): pass
+from agent.evaluators.fitness_evaluator import FitnessEvaluator
 
 
 class WeightedEvaluator(FitnessEvaluator):
@@ -12,7 +7,10 @@ class WeightedEvaluator(FitnessEvaluator):
                    9: 900, 10: 1100, 11: 1300, 12: 1500, 13: 1800}
 
     def get_fitness(self, metrics: list[int]):
-        combos, chain, tallest, roughness, num_moves = metrics[:10], metrics[10], metrics[11], metrics[12], metrics[13]
+        combos, chain, tallest, roughness, move_count = metrics[:10], metrics[10], metrics[11], metrics[12], metrics[13]
         chain_score = sum(self.CHAIN_SCORE.get(c, 0) for c in range(chain))
         combo_score = sum(self.COMBO_SCORE.get(c, 0) for c in combos)
-        return chain_score + combo_score - pow(tallest, 3) - pow(roughness, 2) - pow(1.5, num_moves)
+        weighted_fitness = chain_score + combo_score - pow(tallest, 3) - pow(roughness, 2)
+        if move_count > 30:
+            return 0
+        return weighted_fitness + 1000

@@ -1,6 +1,6 @@
-from bsnes_game import Game
-from tetris_agent import TetrisAgent
-from fitness_evaluator import WeightedEvaluator
+from game.bsnes_game import Game
+from agent.tetris_agent import TetrisAgent
+from agent.evaluators.weighted_evaluator import WeightedEvaluator
 
 
 def main():

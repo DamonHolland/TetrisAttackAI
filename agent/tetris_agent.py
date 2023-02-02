@@ -1,9 +1,9 @@
 import heapq
 import time
 
-from bsnes_game import Game
-from fitness_evaluator import FitnessEvaluator
-from game_state import GameState
+from game.bsnes_game import Game
+from agent.evaluators.fitness_evaluator import FitnessEvaluator
+from game.game_state import GameState
 
 
 class TetrisAgent:
@@ -16,7 +16,8 @@ class TetrisAgent:
         time.sleep(0.2)
         self.game.restart_game()
         while self.game.is_game_live():
-            best_state = GameState(self.evaluator, None, None, self.game.get_tile_map(), self.game.get_chain())
+            best_state = GameState(self.evaluator, None, None, self.game.get_tile_map(),
+                                   self.game.get_chain(), (self.game.get_cursor_x(), self.game.get_cursor_y()))
             search_queue = [best_state]
             end_time = time.perf_counter_ns() + self.evaluation_time_limit
             while time.perf_counter_ns() < end_time:
@@ -27,6 +28,9 @@ class TetrisAgent:
                     if new_state.fitness > best_state.fitness:
                         best_state = new_state
                     heapq.heappush(search_queue, new_state)
-            print(f"Scanned: {len(search_queue)} Best: {best_state.moves}")
-            self.game.perform_moves(best_state.moves)
+            print(f"Scanned: {len(search_queue)} Best: {best_state.moves}, Fitness: {best_state.fitness}")
+            if best_state.fitness < 0:
+                self.game.perform_raise()
+            else:
+                self.game.perform_moves(best_state.moves)
         return self.game.get_score()
