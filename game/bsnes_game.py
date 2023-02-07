@@ -44,6 +44,7 @@ class Game:
         self.state_addr = self.base_addr + 0x74FE44
         self.live_addr = self.base_addr + 0x74F15C
         self.chain_addr = self.base_addr + 0x74F268
+        self.stopped_addr = self.base_addr + 0x1B7B300
 
         self.game_window = pyautogui.getWindowsWithTitle("Tetris Attack")[0]
         self.game_window.activate()
@@ -61,6 +62,9 @@ class Game:
     def is_game_live(self) -> bool:
         return bool.from_bytes(self.snes_process.read_bytes(self.live_addr, 1), 'little')
 
+    def is_game_stopped(self) -> bool:
+        return bool.from_bytes(self.snes_process.read_bytes(self.stopped_addr, 1), 'little')
+
     def get_tile_map(self) -> list[list[int]]:
         tile_map = []
         curr_addr = self.state_addr
@@ -74,16 +78,17 @@ class Game:
         return list(map(list, zip(*tile_map)))
 
     def get_chain(self) -> int:
-        return int.from_bytes(self.snes_process.read_bytes(self.chain_addr, 1), 'little') + 1
+        return int.from_bytes(self.snes_process.read_bytes(self.chain_addr, 1), 'little')
 
     def perform_moves(self, moves: list[tuple[int, int]]):
         starting_cursor_x, starting_cursor_y = self.get_cursor_x(), self.get_cursor_y()
         if not self.game_window.isActive:
             self.game_window.activate()
+        self.release_all_keys()
 
         for cell_x, cell_y in moves:
+            if not self.is_game_live(): return
             cursor_diff_x, cursor_diff_y = starting_cursor_x - cell_x, starting_cursor_y - cell_y
-            print(f"Performing move {[cell_x, cell_y]}")
             for _ in range(abs(cursor_diff_x)):
                 if cursor_diff_x > 0:
                     pydirectinput.press(self.LEFT_KEY)
@@ -101,13 +106,18 @@ class Game:
     def restart_game(self):
         if not self.game_window.isActive:
             self.game_window.activate()
-        time.sleep(0.2)
-        pydirectinput.press(self.CHANGE_SAVE_KEY)
-        time.sleep(0.1)
+        start_time = time.perf_counter()
         pydirectinput.press(self.RESET_KEY)
-        while True:
+        while time.perf_counter() - start_time < 1:
             if self.is_game_live():
                 return
+        self.restart_game()
+
+    def change_save_state(self):
+        if not self.game_window.isActive:
+            self.game_window.activate()
+        pydirectinput.press(self.CHANGE_SAVE_KEY)
+        time.sleep(0.2)
 
     def perform_raise(self):
         pydirectinput.press(self.RAISE_KEY)

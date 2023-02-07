@@ -12,7 +12,7 @@ class GameState:
 
     def __init__(self, evaluator: FitnessEvaluator, parent: 'GameState' or None, new_move: tuple[int, int] or None,
                  initial_tiles: list[list[int]] = None, initial_chain: int = None,
-                 initial_cursor: tuple[int, int] or None = None, terminal: bool = False):
+                 initial_cursor: tuple[int, int] or None = None, terminal: bool = False, is_stopped: bool = False):
         # Initial state initialisation
         self.parent: GameState = parent
         if parent:
@@ -20,11 +20,13 @@ class GameState:
             self.moves: list[tuple[int, int]] = self.parent.moves + [new_move]
             self.initial_chain = self.parent.initial_chain
             self.initial_cursor: tuple[int, int] = self.parent.initial_cursor
+            self.is_stopped: bool = self.parent.is_stopped
         else:
             self.initial_state: list[list[int]] = initial_tiles
             self.moves: list[tuple[int, int]] = []
             self.initial_chain = initial_chain
             self.initial_cursor: tuple[int, int] = initial_cursor
+            self.is_stopped: bool = is_stopped
         self.evaluator = evaluator
         self.chain: int = self.initial_chain
         self.state: list[list[int]] = custom_deepcopy(self.initial_state)
@@ -101,20 +103,22 @@ class GameState:
             else:
                 self.locked_cells.update(terminal_cells)
 
-    def get_height_metrics(self) -> tuple[int, int]:
+    def get_block_metrics(self) -> tuple[int, int, int]:
         col_heights = []
+        total_blocks = 0
         for c in range(self.BOARD_WIDTH):
             for r in range(self.BOARD_HEIGHT):
                 if self.state[c][r] != 0: continue
+                total_blocks += r
                 col_heights.append(r)
                 break
-        return max(col_heights), sum(abs(a - b) for a, b in zip(col_heights, col_heights[1:]))
+        return max(col_heights), sum(abs(a - b) for a, b in zip(col_heights, col_heights[1:])), total_blocks
 
     def get_metrics(self) -> list[int]:
-        tallest, roughness = self.get_height_metrics()
-        padded_combos = self.combos[:10]
-        padded_combos += [0] * (10 - len(padded_combos))
-        return padded_combos + [self.chain] + [tallest] + [roughness] + [self.get_move_count()]
+        tallest, roughness, total_blocks = self.get_block_metrics()
+        combos = self.combos[:5]
+        combos += [0] * (5 - len(combos))
+        return combos + [self.chain, tallest, roughness, total_blocks, self.get_move_count(), int(self.is_stopped)]
 
     def get_move_count(self) -> int:
         moves = [self.initial_cursor] + self.moves
